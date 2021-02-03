@@ -291,6 +291,11 @@ class NoteForYourThoughts(App):
         screen.add_widget(self.InfoPage)
         self.ScreenManager.add_widget(screen)
 
+        try:
+            os.mkdir('./notes/')
+        except FileExistsError:
+            pass
+
         return self.ScreenManager
 
 
