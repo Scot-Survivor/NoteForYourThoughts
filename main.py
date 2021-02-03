@@ -115,7 +115,7 @@ class SavePage(GridLayout):
             marshal_data = marshal.dumps(self.Note.toJSON())
             f = open(path, mode="wb")
             marshal.dump(marshal_data, f)
-            RunApp.ScreenManager.current = "NoteEntry"  # TODO Change this to a "Information" screen.
+            RunApp.ScreenManager.current = "NoteEntry"
 
 
 class LoadPage(GridLayout):
