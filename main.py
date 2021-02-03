@@ -1,16 +1,19 @@
 import marshal
 import hashlib
 import os
-import tempfile
+import secrets
+import time
 
 from kivy.app import App
 from kivy.uix.gridlayout import GridLayout  # Main layout to be used in the project
 from kivy.uix.screenmanager import ScreenManager, Screen  # Allow to easily switch between screens
+from kivy.core.window import Window
 
 # Widgets
 from kivy.uix.label import Label  # Label for either text showing or blank bar
 from kivy.uix.button import Button  # Button for you guessed it button things.
 from kivy.uix.textinput import TextInput  # Text input Widget
+from kivy.uix.filechooser import FileChooserListView
 
 
 # Encryption
@@ -21,32 +24,42 @@ import datetime as dt
 
 
 class SavableNote:
-    def __init__(self, name=None, key=None, text=None, date=None, password=None, author=None):
+    def __init__(self, name=None, key=None, text=None, date=None, password=None, author=None, decrypt=False, iv=None, work_factor=20_000):
         self.name = name
         self.key = key
         self.author = author
         self.date = date
-        if self.key is not None:
+        if self.key is not None and not decrypt:
             self.Cipher = encryption.AESCipher(self.key)
             self.iv = self.Cipher.iv
             self.text = self.Cipher.encrypt(text)
-            self.password = self.Cipher.encrypt(password)
+            self.work_factor = work_factor
+            self.salt = secrets.token_urlsafe(128).encode('utf-8')  # 128 bit salt for security purposes
+            self.hashed_password = hashlib.pbkdf2_hmac("sha256", password.encode('utf-8'), self.salt, self.work_factor).hex()
+        elif self.key is not None and decrypt and iv is not None:
+            self.Cipher = encryption.AESCipher(self.key)
+            self.Cipher.iv = iv
+            self.text = self.Cipher.decrypt(text)
+        else:
+            self.text = text
 
     def toJSON(self):
-        return {'name': self.name, 'key': self.key, 'author': self.author, 'date': self.date,
+        return {'name': self.name, 'author': self.author, 'date': self.date,
                 'cipher': self.Cipher.toJSON(), 'iv': self.iv, 'text': self.text,
-                'password': self.password}
+                'hashed_password': self.hashed_password, 'work_factor': self.work_factor,
+                'salt': self.salt}
 
     def fromJSON(self, json_data):
         self.Cipher = encryption.AESCipher()
-        self.key = json_data['key']
         self.name = json_data['name']
         self.author = json_data['author']
         self.date = json_data['date']
         self.Cipher.fromJSON(json_data['cipher'])
         self.iv = json_data['iv']
         self.text = json_data['text']
-        self.password = json_data['password']
+        self.hashed_password = json_data['hashed_password']
+        self.work_factor = json_data['work_factor']
+        self.salt = json_data['salt']
 
 
 class SavePage(GridLayout):
@@ -72,7 +85,14 @@ class SavePage(GridLayout):
         self.Cancel.bind(on_release=self.CancelBind)
         self.add_widget(self.Cancel)
         self.Save = Button(text="Save", color=(1, 1, 1, 1), size_hint=(1, .1))
+        self.Save.bind(on_release=self.SaveBind)
         self.add_widget(self.Save)
+
+        Window.bind(on_key_down=self.on_key_down)
+
+    def on_key_down(self, instance, keyboard, keycode, text, modifiers):
+        if keycode == 40 and RunApp.ScreenManager.current == "Save":
+            self.SaveBind(instance, keyboard, keycode, text, modifiers)
 
     def setNote(self, note):
         self.Note = note
@@ -91,11 +111,95 @@ class SavePage(GridLayout):
                     i += 1
                     path = f"./notes/{self.Name.text}({i}).note"
             key = hashlib.md5(self.Password.text.encode('utf-8')).hexdigest().encode()
-            self.Note = SavableNote(name=self.Name.text, key=key, text=self.Note.text, date=self.Note.text, author=self.Author.text)
+            self.Note = SavableNote(name=self.Name.text, key=key, text=self.Note.text, date=self.Note.text, author=self.Author.text, password=self.Password.text)
             marshal_data = marshal.dumps(self.Note.toJSON())
             f = open(path, mode="wb")
             marshal.dump(marshal_data, f)
             RunApp.ScreenManager.current = "NoteEntry"  # TODO Change this to a "Information" screen.
+
+
+class LoadPage(GridLayout):
+    def __init__(self, **kwargs):
+        super(LoadPage, self).__init__(**kwargs)
+        self.cols = 0
+        self.rows = 3
+
+        self.add_widget(FileChooserListView(path='./notes/', size_hint=(1, .4)))
+
+        self.BottomLayout = GridLayout(cols=2, rows=3)
+
+        self.BottomLayout.add_widget(Label(text="Note Name"))
+        self.Name = TextInput(multiline=False)
+        self.BottomLayout.add_widget(self.Name)
+
+        self.BottomLayout.add_widget(Label(text="Password\n", markup=True))
+        self.Password = TextInput(multiline=False, password=True)
+        self.BottomLayout.add_widget(self.Password)
+
+        self.Cancel = Button(text="Cancel", color=(1, 1, 1, 1), size_hint=(1, .1))
+        self.Cancel.bind(on_release=self.CancelBind)
+        self.BottomLayout.add_widget(self.Cancel)
+        self.Load = Button(text="Load", color=(1, 1, 1, 1), size_hint=(1, .1))
+        self.Load.bind(on_release=self.LoadBind)
+        self.BottomLayout.add_widget(self.Load)
+
+        self.add_widget(self.BottomLayout)
+
+    @staticmethod
+    def CancelBind(*args):
+        RunApp.ScreenManager.current = "NoteEntry"
+
+    def LoadBind(self, *args):
+        password = self.Password.text
+        name = self.Name.text
+        if ".note" not in name:
+            name += ".note"
+        f = open(f'./notes/{name}', 'rb')
+        open_marshal = marshal.load(f)
+        NewNote = SavableNote()
+        NewNote.fromJSON(marshal.loads(open_marshal))
+        hashed_password = NewNote.hashed_password
+        work_factor = NewNote.work_factor
+        salt = NewNote.salt
+        if hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, work_factor).hex() == hashed_password:
+            key = hashlib.md5(self.Password.text.encode('utf-8')).hexdigest().encode()
+            PlainTextNote = SavableNote(name=name.split('.')[0], key=key, decrypt=True, iv=NewNote.iv, text=NewNote.text)
+            RunApp.NoteEntry.TextArea.text = PlainTextNote.text
+            RunApp.NoteEntry.TextIArea.text = PlainTextNote.text
+            if not RunApp.NoteEntry.Editing:
+                RunApp.NoteEntry.Editing = True
+                RunApp.NoteEntry.ShowOrHideText()
+            RunApp.ScreenManager.current = "NoteEntry"
+        else:
+            RunApp.InfoPage.update_info("Error Password is wrong.")
+            RunApp.ScreenManager.current = "Info"
+            time.sleep(2)
+            RunApp.ScreenManager.current = "NoteEntry"
+
+
+class InfoPage(GridLayout):
+    def __init__(self, **kwargs):
+        super(InfoPage, self).__init__(**kwargs)
+
+        # Add just one column
+        self.cols = 1
+
+        # Add one label for a message
+        self.MessageLabel = Label(halign="center", valign="middle", font_size=30)
+
+        # By default every widget returns it's side as [100, 100], it gets finally resized,
+        # but we have to listen for size change to get a new one
+        # more: https://github.com/kivy/kivy/issues/1044
+        self.MessageLabel.bind(width=self.update_text_width)
+
+        # Add Label to layout
+        self.add_widget(self.MessageLabel)
+
+    def update_info(self, message):
+        self.MessageLabel.text = message
+
+    def update_text_width(self, *_):
+        self.MessageLabel.text_size = (self.MessageLabel.width * 0.9, None)
 
 
 class NotePage(GridLayout):
@@ -106,9 +210,10 @@ class NotePage(GridLayout):
         self.cols = 1
         self.TopRow = GridLayout(cols=1, rows=1)
 
-        self.MiddleRow = GridLayout(cols=3, rows=1, size_hint=(1, .1))
+        self.MiddleRow = GridLayout(cols=4, rows=1, size_hint=(1, .1))
         self.Minimise = Button(text="-", color=(1, 1, 1, 1), size_hint=(.1, 1), font_size=75, on_press=self.ShowOrHideText)
         self.SaveButton = Button(text="Save", color=(1, 1, 1, 1), size_hint=(.1, 1), on_press=self.SaveNote)
+        self.LoadButton = Button(text="Load", color=(1, 1, 1, 1), size_hint=(.1, 1), on_press=self.LoadNote)
 
         self.TextIArea = TextInput(multiline=True, text="Test", size_hint=(1, 1))
 
@@ -121,6 +226,7 @@ class NotePage(GridLayout):
         # Middle Row stuff
         self.MiddleRow.add_widget(self.Minimise)
         self.MiddleRow.add_widget(self.SaveButton)
+        self.MiddleRow.add_widget(self.LoadButton)
         self.MiddleRow.add_widget(Label())
 
         self.add_widget(self.MiddleRow)
@@ -149,8 +255,12 @@ class NotePage(GridLayout):
 
     def SaveNote(self, *args):
         Note = SavableNote(name=None, key=None, text=self.TextArea.text, date=dt.datetime.now().strftime("%d-%m-%Y"), password=None, author=None)
-        RunApp.SavePage.setData(Note)
+        RunApp.SavePage.setNote(Note)
         RunApp.ScreenManager.current = "Save"
+
+    @staticmethod
+    def LoadNote(*args):
+        RunApp.ScreenManager.current = "Load"
 
 
 # noinspection PyAttributeOutsideInit
@@ -169,6 +279,16 @@ class NoteForYourThoughts(App):
         self.SavePage = SavePage()
         screen = Screen(name="Save")
         screen.add_widget(self.SavePage)
+        self.ScreenManager.add_widget(screen)
+
+        self.LoadPage = LoadPage()
+        screen = Screen(name="Load")
+        screen.add_widget(self.LoadPage)
+        self.ScreenManager.add_widget(screen)
+
+        self.InfoPage = InfoPage()
+        screen = Screen(name="Info")
+        screen.add_widget(self.InfoPage)
         self.ScreenManager.add_widget(screen)
 
         return self.ScreenManager
