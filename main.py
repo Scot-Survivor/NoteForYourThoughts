@@ -91,7 +91,7 @@ class SavePage(GridLayout):
         Window.bind(on_key_down=self.on_key_down)
 
     def on_key_down(self, instance, keyboard, keycode, text, modifiers):
-        if keycode == 40 and RunApp.ScreenManager.current == "Save":
+        if keycode == 13 and RunApp.ScreenManager.current == "Save":
             self.SaveBind(instance, keyboard, keycode, text, modifiers)
 
     def setNote(self, note):
