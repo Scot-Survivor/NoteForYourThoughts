@@ -172,19 +172,27 @@ class LoadPage(GridLayout):
             RunApp.ScreenManager.current = "NoteEntry"
         else:
             RunApp.InfoPage.update_info("Error Password is wrong.")
+            RunApp.InfoPage.Next = "NoteEntry"
             RunApp.ScreenManager.current = "Info"
-            RunApp.ScreenManager.current = "NoteEntry"
+            # RunApp.ScreenManager.current = "NoteEntry"
 
 
 class InfoPage(GridLayout):
+    Next = ""
     def __init__(self, **kwargs):
         super(InfoPage, self).__init__(**kwargs)
+        if self.Next == "" and RunApp.ScreenManager.current == "Info":
+            raise Exception(f"Invalid Info Page.")
 
         # Add just one column
         self.cols = 1
+        self.rows = 2
 
         # Add one label for a message
         self.MessageLabel = Label(halign="center", valign="middle", font_size=30)
+        self.Continue = Button(text="Continue", color=(1, 1, 1, 1), size_hint=(1, .1))
+        self.Continue.bind(on_release=self.continue_bind)
+    
 
         # By default every widget returns it's side as [100, 100], it gets finally resized,
         # but we have to listen for size change to get a new one
@@ -193,6 +201,11 @@ class InfoPage(GridLayout):
 
         # Add Label to layout
         self.add_widget(self.MessageLabel)
+        self.add_widget(self.Continue)
+    
+    def continue_bind(self, *args):
+        RunApp.ScreenManager.current = self.Next
+        self.Next = ""
 
     def update_info(self, message):
         self.MessageLabel.text = message
