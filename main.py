@@ -173,7 +173,6 @@ class LoadPage(GridLayout):
         else:
             RunApp.InfoPage.update_info("Error Password is wrong.")
             RunApp.ScreenManager.current = "Info"
-            time.sleep(2)
             RunApp.ScreenManager.current = "NoteEntry"
 
 
