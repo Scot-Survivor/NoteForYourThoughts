@@ -122,24 +122,20 @@ class LoadPage(GridLayout):
     def __init__(self, **kwargs):
         super(LoadPage, self).__init__(**kwargs)
         self.cols = 0
-        self.rows = 3
+        self.rows = 2
+        self.FileChooser = FileChooserListView(path='./notes/', size_hint=(1, .4), filters=['*.note'])
+        self.add_widget(self.FileChooser)
 
-        self.add_widget(FileChooserListView(path='./notes/', size_hint=(1, .4)))
-
-        self.BottomLayout = GridLayout(cols=2, rows=3)
-
-        self.BottomLayout.add_widget(Label(text="Note Name"))
-        self.Name = TextInput(multiline=False)
-        self.BottomLayout.add_widget(self.Name)
+        self.BottomLayout = GridLayout(cols=2, rows=3, size_hint=(1, .05))
 
         self.BottomLayout.add_widget(Label(text="Password\n", markup=True))
         self.Password = TextInput(multiline=False, password=True)
         self.BottomLayout.add_widget(self.Password)
 
-        self.Cancel = Button(text="Cancel", color=(1, 1, 1, 1), size_hint=(1, .1))
+        self.Cancel = Button(text="Cancel", color=(1, 1, 1, 1))
         self.Cancel.bind(on_release=self.CancelBind)
         self.BottomLayout.add_widget(self.Cancel)
-        self.Load = Button(text="Load", color=(1, 1, 1, 1), size_hint=(1, .1))
+        self.Load = Button(text="Load", color=(1, 1, 1, 1))
         self.Load.bind(on_release=self.LoadBind)
         self.BottomLayout.add_widget(self.Load)
 
@@ -151,10 +147,10 @@ class LoadPage(GridLayout):
 
     def LoadBind(self, *args):
         password = self.Password.text
-        name = self.Name.text
+        name = self.FileChooser.path + "/" + os.path.basename(self.FileChooser.selection[0])
         if ".note" not in name:
             name += ".note"
-        f = open(f'./notes/{name}', 'rb')
+        f = open(f'{name}', 'rb')
         open_marshal = marshal.load(f)
         NewNote = SavableNote()
         NewNote.fromJSON(marshal.loads(open_marshal))
