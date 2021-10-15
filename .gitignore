@@ -218,3 +218,5 @@ NFTY
 NFTYOneFile
 bin/
 .buildozer/
+.vscode/
+sdk-tools-linux-3859397.zip
