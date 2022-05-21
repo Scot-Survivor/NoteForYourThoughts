@@ -2,7 +2,6 @@ import marshal
 import hashlib
 import os
 import secrets
-import time
 
 from kivy.app import App
 from kivy.uix.gridlayout import GridLayout  # Main layout to be used in the project
@@ -15,13 +14,11 @@ from kivy.uix.button import Button  # Button for you guessed it button things.
 from kivy.uix.textinput import TextInput  # Text input Widget
 from kivy.uix.filechooser import FileChooserListView
 
-
 # Encryption
 from NotesEncrpytion import encryption
 
 # Time
 import datetime as dt
-
 
 HASH_FUNC = hashlib.sha512
 
@@ -101,10 +98,10 @@ class SavePage(GridLayout):
         self.Note = note
 
     @staticmethod
-    def CancelBind(*args):
+    def CancelBind(*_):
         RunApp.ScreenManager.current = "NoteEntry"
 
-    def SaveBind(self, *args):
+    def SaveBind(self, *_):
         if self.Note is not None:
             path = f"./notes/{self.Name.text}.note"
             if os.path.exists(path):
@@ -145,10 +142,10 @@ class LoadPage(GridLayout):
         self.add_widget(self.BottomLayout)
 
     @staticmethod
-    def CancelBind(*args):
+    def CancelBind(*_):
         RunApp.ScreenManager.current = "NoteEntry"
 
-    def LoadBind(self, *args):
+    def LoadBind(self, *_):
         password = self.Password.text
         name = self.FileChooser.path + "/" + os.path.basename(self.FileChooser.selection[0])
         if ".note" not in name:
@@ -178,10 +175,11 @@ class LoadPage(GridLayout):
 
 class InfoPage(GridLayout):
     Next = ""
+
     def __init__(self, **kwargs):
         super(InfoPage, self).__init__(**kwargs)
         if self.Next == "" and RunApp.ScreenManager.current == "Info":
-            raise Exception(f"Invalid Info Page.")
+            raise Exception("Invalid Info Page.")
 
         # Add just one column
         self.cols = 1
@@ -191,7 +189,6 @@ class InfoPage(GridLayout):
         self.MessageLabel = Label(halign="center", valign="middle", font_size=30)
         self.Continue = Button(text="Continue", color=(1, 1, 1, 1), size_hint=(1, .1))
         self.Continue.bind(on_release=self.continue_bind)
-    
 
         # By default every widget returns it's side as [100, 100], it gets finally resized,
         # but we have to listen for size change to get a new one
@@ -201,8 +198,8 @@ class InfoPage(GridLayout):
         # Add Label to layout
         self.add_widget(self.MessageLabel)
         self.add_widget(self.Continue)
-    
-    def continue_bind(self, *args):
+
+    def continue_bind(self, *_):
         RunApp.ScreenManager.current = self.Next
         self.Next = ""
 
@@ -245,7 +242,7 @@ class NotePage(GridLayout):
         # Bottom row?
         self.add_widget(self.TextIArea)
 
-    def ShowOrHideText(self, *args):
+    def ShowOrHideText(self, *_):
         if self.Editing:
             self.Minimise.text = "+"
             # self.TextIArea.size_hint = (0, 0)
@@ -264,19 +261,18 @@ class NotePage(GridLayout):
             # self.TextArea.size_hint = (0, 0)
             self.Editing = True
 
-    def SaveNote(self, *args):
+    def SaveNote(self, *_):
         Note = SavableNote(name=None, key=None, text=self.TextArea.text, date=dt.datetime.now().strftime("%d-%m-%Y"), password=None, author=None)
         RunApp.SavePage.setNote(Note)
         RunApp.ScreenManager.current = "Save"
 
     @staticmethod
-    def LoadNote(*args):
+    def LoadNote(*_):
         RunApp.ScreenManager.current = "Load"
 
 
 # noinspection PyAttributeOutsideInit
 class NoteForYourThoughts(App):
-
     ScreenManager = None
 
     def build(self):
