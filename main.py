@@ -23,6 +23,9 @@ from NotesEncrpytion import encryption
 import datetime as dt
 
 
+HASH_FUNC = hashlib.sha512
+
+
 class SavableNote:
     def __init__(self, name=None, key=None, text=None, date=None, password=None, author=None, decrypt=False, iv=None, work_factor=20_000):
         self.name = name
@@ -110,7 +113,7 @@ class SavePage(GridLayout):
                 while os.path.exists(path):
                     i += 1
                     path = f"./notes/{self.Name.text}({i}).note"
-            key = hashlib.md5(self.Password.text.encode('utf-8')).hexdigest().encode()
+            key = HASH_FUNC(self.Password.text.encode('utf-8')).hexdigest().encode()
             self.Note = SavableNote(name=self.Name.text, key=key, text=self.Note.text, date=self.Note.text, author=self.Author.text, password=self.Password.text)
             marshal_data = marshal.dumps(self.Note.toJSON())
             f = open(path, mode="wb")
@@ -162,7 +165,7 @@ class LoadPage(GridLayout):
         work_factor = NewNote.work_factor
         salt = NewNote.salt
         if hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, work_factor).hex() == hashed_password:
-            key = hashlib.md5(self.Password.text.encode('utf-8')).hexdigest().encode()
+            key = HASH_FUNC(self.Password.text.encode('utf-8')).hexdigest().encode()
             PlainTextNote = SavableNote(name=name.split('.')[0], key=key, decrypt=True, iv=NewNote.iv, text=NewNote.text)
             RunApp.NoteEntry.TextArea.text = PlainTextNote.text
             RunApp.NoteEntry.TextIArea.text = PlainTextNote.text
