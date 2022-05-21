@@ -94,7 +94,7 @@ class SavePage(GridLayout):
         Window.bind(on_key_down=self.on_key_down)
 
     def on_key_down(self, instance, keyboard, keycode, text, modifiers):
-        if keycode == 40 and RunApp.ScreenManager.current == "Save":
+        if keycode == 13 and RunApp.ScreenManager.current == "Save":
             self.SaveBind(instance, keyboard, keycode, text, modifiers)
 
     def setNote(self, note):
@@ -125,24 +125,20 @@ class LoadPage(GridLayout):
     def __init__(self, **kwargs):
         super(LoadPage, self).__init__(**kwargs)
         self.cols = 0
-        self.rows = 3
+        self.rows = 2
+        self.FileChooser = FileChooserListView(path='./notes/', size_hint=(1, .4), filters=['*.note'])
+        self.add_widget(self.FileChooser)
 
-        self.add_widget(FileChooserListView(path='./notes/', size_hint=(1, .4)))
-
-        self.BottomLayout = GridLayout(cols=2, rows=3)
-
-        self.BottomLayout.add_widget(Label(text="Note Name"))
-        self.Name = TextInput(multiline=False)
-        self.BottomLayout.add_widget(self.Name)
+        self.BottomLayout = GridLayout(cols=2, rows=3, size_hint=(1, .05))
 
         self.BottomLayout.add_widget(Label(text="Password\n", markup=True))
         self.Password = TextInput(multiline=False, password=True)
         self.BottomLayout.add_widget(self.Password)
 
-        self.Cancel = Button(text="Cancel", color=(1, 1, 1, 1), size_hint=(1, .1))
+        self.Cancel = Button(text="Cancel", color=(1, 1, 1, 1))
         self.Cancel.bind(on_release=self.CancelBind)
         self.BottomLayout.add_widget(self.Cancel)
-        self.Load = Button(text="Load", color=(1, 1, 1, 1), size_hint=(1, .1))
+        self.Load = Button(text="Load", color=(1, 1, 1, 1))
         self.Load.bind(on_release=self.LoadBind)
         self.BottomLayout.add_widget(self.Load)
 
@@ -154,10 +150,10 @@ class LoadPage(GridLayout):
 
     def LoadBind(self, *args):
         password = self.Password.text
-        name = self.Name.text
+        name = self.FileChooser.path + "/" + os.path.basename(self.FileChooser.selection[0])
         if ".note" not in name:
             name += ".note"
-        f = open(f'./notes/{name}', 'rb')
+        f = open(f'{name}', 'rb')
         open_marshal = marshal.load(f)
         NewNote = SavableNote()
         NewNote.fromJSON(marshal.loads(open_marshal))
@@ -175,20 +171,27 @@ class LoadPage(GridLayout):
             RunApp.ScreenManager.current = "NoteEntry"
         else:
             RunApp.InfoPage.update_info("Error Password is wrong.")
+            RunApp.InfoPage.Next = "NoteEntry"
             RunApp.ScreenManager.current = "Info"
-            time.sleep(2)
-            RunApp.ScreenManager.current = "NoteEntry"
+            # RunApp.ScreenManager.current = "NoteEntry"
 
 
 class InfoPage(GridLayout):
+    Next = ""
     def __init__(self, **kwargs):
         super(InfoPage, self).__init__(**kwargs)
+        if self.Next == "" and RunApp.ScreenManager.current == "Info":
+            raise Exception(f"Invalid Info Page.")
 
         # Add just one column
         self.cols = 1
+        self.rows = 2
 
         # Add one label for a message
         self.MessageLabel = Label(halign="center", valign="middle", font_size=30)
+        self.Continue = Button(text="Continue", color=(1, 1, 1, 1), size_hint=(1, .1))
+        self.Continue.bind(on_release=self.continue_bind)
+    
 
         # By default every widget returns it's side as [100, 100], it gets finally resized,
         # but we have to listen for size change to get a new one
@@ -197,6 +200,11 @@ class InfoPage(GridLayout):
 
         # Add Label to layout
         self.add_widget(self.MessageLabel)
+        self.add_widget(self.Continue)
+    
+    def continue_bind(self, *args):
+        RunApp.ScreenManager.current = self.Next
+        self.Next = ""
 
     def update_info(self, message):
         self.MessageLabel.text = message
